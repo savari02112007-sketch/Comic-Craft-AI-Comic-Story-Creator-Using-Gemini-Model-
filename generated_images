@@ -1,0 +1,60 @@
+def generate_image(prompt: str) -> str:
+
+    if not prompt or not prompt.strip():
+        raise ValueError("Image prompt cannot be empty.")
+
+    response = client.models.generate_content(
+        model="gemini-2.5-flash-image",
+        contents=prompt,
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE"],
+            response_format={
+                "image": {
+                    "aspect_ratio": "16:9"
+                }
+            }
+        )
+    )
+
+    print("========== GEMINI RESPONSE ==========")
+    print(response)
+    print("=====================================")
+
+    image_bytes = None
+
+    for candidate in response.candidates or []:
+        if not candidate.content:
+            continue
+
+        for part in candidate.content.parts or []:
+
+            if getattr(part, "inline_data", None):
+                image_bytes = part.inline_data.data
+                break
+
+        if image_bytes:
+            break
+
+    if not image_bytes:
+        raise RuntimeError(
+            "Gemini did not return image data."
+        )
+
+    existing_files = list(
+        OUTPUT_FOLDER.glob("panel_*.png")
+    )
+
+    next_number = len(existing_files) + 1
+
+    filename = f"panel_{next_number}.png"
+    image_path = OUTPUT_FOLDER / filename
+
+    if isinstance(image_bytes, str):
+        image_bytes = base64.b64decode(image_bytes)
+
+    with open(image_path, "wb") as image_file:
+        image_file.write(image_bytes)
+
+    print(f"IMAGE SAVED: {image_path}")
+
+    return f"/generated_images/{filename}"
